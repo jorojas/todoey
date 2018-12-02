@@ -12,9 +12,19 @@ class TodoListViewController: UITableViewController {
 
     var itemArray = ["Rent an appartment", "Buy a Wash machine", "Acquire a TV source", "Buy a TV", "Buy a wifi router"]
     
+    let defaults = UserDefaults.standard
+    let itemArrayKey = "TodoItemArray"
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
+        self.retrievePersistedData()
+    }
+    
+    private func retrievePersistedData() {
+        if let array = self.defaults.array(forKey: itemArrayKey) as? [String] {
+            self.itemArray = array
+        }
     }
     
     //MARK - Table View Configuration
@@ -63,6 +73,7 @@ class TodoListViewController: UITableViewController {
             if !(textField.text?.isEmpty)! {
                 self.itemArray.append(textField.text!)
                 self.tableView.reloadData()
+                self.defaults.setValue(self.itemArray, forKey: self.itemArrayKey)
             }
             
             print("Success")
