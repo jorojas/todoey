@@ -8,7 +8,7 @@
 
 import Foundation
 
-class TodoItem {
+class TodoItem: NSObject, Codable {
     var title: String = ""
     var checked: Bool = false
     

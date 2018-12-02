@@ -14,11 +14,12 @@ class TodoListViewController: UITableViewController {
     
     let defaults = UserDefaults.standard
     let itemArrayKey = "TodoItemArray"
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("TodoItems.plist")
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-        //self.retrievePersistedData()
+        self.restoreItems()
     }
     
     private func retrievePersistedData() {
@@ -58,6 +59,7 @@ class TodoListViewController: UITableViewController {
                 item.checked = !item.checked
                 self.setCheckmark(item: item, cell: cell)
                 self.tableView.reloadData()
+                self.persistItems()
             }
         }
         
@@ -107,6 +109,32 @@ extension TodoListViewController {
         self.itemArray.append(item)
         
         self.tableView.reloadData()
-        self.defaults.setValue(self.itemArray, forKey: self.itemArrayKey)
+        
+        self.persistItems()
+    }
+    
+    private func persistItems() {
+        //self.defaults.setValue(self.itemArray, forKey: self.itemArrayKey)
+        let encoder = PropertyListEncoder()
+        
+        do {
+            let data = try encoder.encode(self.itemArray)
+            
+            try data.write(to: self.dataFilePath!)
+        } catch {
+            print("Error encoding data")
+        }
+    }
+    
+    private func restoreItems() {
+        do {
+            let data = try Data(contentsOf: self.dataFilePath!)
+            let decoder = PropertyListDecoder()
+            
+            self.itemArray = try decoder.decode([TodoItem].self, from: data)
+            
+        } catch {
+            print("Error decoding item array: \(error)")
+        }
     }
 }
