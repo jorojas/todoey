@@ -7,12 +7,13 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class CategoryViewController: UITableViewController {
     
-    var categoryArray = [Category]()
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let realm = try! Realm()
+    
+    var categories: Results<Category>?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -26,14 +27,13 @@ class CategoryViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return self.categoryArray.count
+        return self.categories?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        let category = self.categoryArray[indexPath.row]
         
-        cell.textLabel?.text = category.name
+        cell.textLabel?.text = self.categories?[indexPath.row].name ?? "No categories added yet"
         
         return cell
     }
@@ -47,7 +47,7 @@ class CategoryViewController: UITableViewController {
             case "goToItems":
                 let destinationVC = segue.destination as! TodoListViewController
                 if let indexPath = self.tableView.indexPathForSelectedRow {
-                    destinationVC.selectedCategory = self.categoryArray[indexPath.row]
+                    destinationVC.selectedCategory = self.categories?[indexPath.row]
                     print("selected category: \(destinationVC.selectedCategory?.name)")
                 }
                 break
@@ -80,34 +80,27 @@ class CategoryViewController: UITableViewController {
 //MARK - Extension for Model Manipulation
 extension CategoryViewController {
     private func addCategory(title: String) {
-        let category = Category(context: self.context)
+        let category = Category()
         category.name = title
         
-        self.categoryArray.append(category)
-        self.tableView.reloadData()
+        self.persist(category: category)
         
-        self.persist()
+        self.tableView.reloadData()
     }
     
-    private func persist() {
+    private func persist(category: Category) {
         do {
-            try self.context.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("Error saving data")
         }
     }
     
     private func restore() {
-        let request: NSFetchRequest<Category> = Category.fetchRequest()
-        self.fetch(with: request)
-    }
-    
-    private func fetch(with request: NSFetchRequest<Category>) {
-        do {
-            self.categoryArray = try context.fetch(request)
-            self.tableView.reloadData()
-        } catch {
-            print("Error fetching data from context: \(error)")
-        }
+        self.categories = self.realm.objects(Category.self)
+        
+        self.tableView.reloadData()
     }
 }

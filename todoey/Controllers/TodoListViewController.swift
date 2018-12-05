@@ -7,19 +7,19 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class TodoListViewController: UITableViewController {
 
-    var itemArray = [Item]()
+    let realm = try! Realm()
+    
+    var todoItems: Results<Item>?
     var selectedCategory: Category? {
         didSet {
             self.restoreItems()
             self.setNavTitle()
         }
     }
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -34,15 +34,15 @@ class TodoListViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return itemArray.count
+        return todoItems?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell: UITableViewCell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
         
-        cell.textLabel?.text = itemArray[indexPath.row].title
+        cell.textLabel?.text = todoItems?[indexPath.row].title ?? "No items for this category"
         
-        if let item: Item = self.itemArray[indexPath.row] {
+        if let item: Item = self.todoItems?[indexPath.row] {
             self.setCheckmark(item: item, cell: cell)
         }
         
@@ -54,11 +54,17 @@ class TodoListViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         if let cell: UITableViewCell = tableView.cellForRow(at: indexPath) {
             
-            if let item: Item = self.itemArray[indexPath.row] {
-                item.checked = !item.checked
+            if let item: Item = self.todoItems?[indexPath.row] {
+                do {
+                    try self.realm.write {
+                        item.checked = !item.checked
+                    }
+                } catch {
+                    print("Error updating checked data to realm: \(error)")
+                }
+                
                 self.setCheckmark(item: item, cell: cell)
                 self.tableView.reloadData()
-                self.persistItems()
             }
         }
         
@@ -105,13 +111,9 @@ class TodoListViewController: UITableViewController {
 //MARK - SearchBar configuration
 extension TodoListViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        let request: NSFetchRequest<Item> = Item.fetchRequest()
+        self.todoItems = self.todoItems?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "dateCreated", ascending: true)
         
-        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!), NSPredicate(format: "parentCategory.name MATCHES %@", self.selectedCategory!.name!)])
-        
-        request.sortDescriptors = [(NSSortDescriptor(key: "title", ascending: true))]
-        
-        fetchItems(with: request)
+        self.tableView.reloadData()
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
@@ -130,42 +132,24 @@ extension TodoListViewController {
     
     private func addItem(title: String) {
         
-        let item = Item(context: self.context)
-        item.title = title
-        item.checked = false
-        item.parentCategory = self.selectedCategory
-        
-        self.itemArray.append(item)
+        if let currentCategory = self.selectedCategory {
+            do {
+                try self.realm.write {
+                    let item = Item()
+                    item.title = title
+                    item.checked = false
+                    currentCategory.items.append(item)
+                }
+            } catch {
+                print("Error saving data to realm: \(error)")
+            }
+            
+        }
         
         self.tableView.reloadData()
-        
-        self.persistItems()
-    }
-    
-    private func persistItems() {
-        
-        do {
-            try self.context.save()
-        } catch {
-            print("Error saving data")
-        }
     }
     
     private func restoreItems() {
-        let request: NSFetchRequest<Item> = Item.fetchRequest()
-        
-        request.predicate = NSPredicate(format: "parentCategory.name MATCHES %@", self.selectedCategory!.name!)
-        
-        self.fetchItems(with: request)
-    }
-    
-    private func fetchItems(with request: NSFetchRequest<Item>) {
-        do {
-            self.itemArray = try context.fetch(request)
-            
-            self.tableView.reloadData()
-        } catch {
-            print("Error fetching data from context: \(error)")
-        }
+        self.todoItems = self.selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
     }
 }
